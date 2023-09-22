@@ -1,5 +1,12 @@
-import { NDKCacheAdapter, NDKFilter } from "@nostr-dev-kit/ndk";
-import { NDKSubscription, NDKEvent } from "@nostr-dev-kit/ndk";
+import { 
+    NDKCacheAdapter,
+    NDKFilter,
+    NDKSubscription,
+    NDKEvent,
+    NDKKind,
+    NDKTag,
+    NDKRelayList
+} from "@nostr-dev-kit/ndk";
 import Redis from "ioredis";
 import _debug from "debug";
 
@@ -85,5 +92,18 @@ export default class RedisAdapter implements NDKCacheAdapter {
                 this.redis.expire(key, this.expirationTime),
             ]).then(() => resolve());
         });
+    }
+
+    public async getRelayList(pubkey: string): Promise<string[][]> {
+        const key = `${pubkey}:${NDKKind.RelayList}`;
+        const cacheHits = await this.redis.smembers(key);
+        return cacheHits.map((hit) => JSON.parse(hit));
+    }
+
+    public async saveRelayList(relayListEvent: NDKRelayList): Promise<void> {
+        const key = `${relayListEvent.pubkey}:${NDKKind.RelayList}`;
+        const ndkRelayListTags = relayListEvent.getMatchingTags("r");
+        const saveRelayList = ndkRelayListTags.map((tag: NDKTag) => this.redis.sadd(key, JSON.stringify(tag)));
+        await Promise.all(saveRelayList);
     }
 }
